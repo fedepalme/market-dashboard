@@ -100,13 +100,74 @@ def fetch_all_data():
     return rows
 
 
+def _parse_article(article: dict) -> dict | None:
+    """Normalize yfinance news article across different API versions."""
+    # New yfinance structure: article may have nested 'content'
+    content = article.get("content", {})
+    title = (
+        article.get("title")
+        or content.get("title")
+        or content.get("headline")
+        or ""
+    )
+    link = (
+        article.get("link")
+        or article.get("url")
+        or content.get("canonicalUrl", {}).get("url", "")
+        or content.get("clickThroughUrl", {}).get("url", "")
+        or ""
+    )
+    publisher = (
+        article.get("publisher")
+        or content.get("provider", {}).get("displayName", "")
+        or ""
+    )
+    ts = article.get("providerPublishTime") or article.get("pubDate") or None
+    if isinstance(ts, str):
+        try:
+            ts = int(datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp())
+        except Exception:
+            ts = None
+    if not title or not link:
+        return None
+    return {"title": title, "link": link, "publisher": publisher, "ts": ts}
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_news(ticker: str):
+def fetch_news(ticker: str) -> list[dict]:
     try:
-        news = yf.Ticker(ticker).news or []
-        return news[:6]
+        raw = yf.Ticker(ticker).news or []
+        parsed = [_parse_article(a) for a in raw]
+        return [a for a in parsed if a is not None][:6]
     except Exception:
         return []
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_top_news(n: int = 10) -> list[dict]:
+    """Aggregate news from key tickers, deduplicate, return top-n by date."""
+    key_tickers = MY_PORTFOLIO + ["NVDA", "MSFT", "GOOGL", "AMZN", "TSLA",
+                                   "JPM", "BRK.B", "NFLX", "DIS", "QQQ", "SPY"]
+    seen_titles: set[str] = set()
+    all_articles: list[dict] = []
+    for ticker in key_tickers:
+        try:
+            raw = yf.Ticker(ticker).news or []
+            for a in raw:
+                parsed = _parse_article(a)
+                if parsed is None:
+                    continue
+                key = parsed["title"].lower().strip()[:80]
+                if key in seen_titles:
+                    continue
+                seen_titles.add(key)
+                parsed["ticker"] = ticker
+                parsed["company"] = TICKERS.get(ticker, {}).get("name", ticker)
+                all_articles.append(parsed)
+        except Exception:
+            continue
+    all_articles.sort(key=lambda x: x.get("ts") or 0, reverse=True)
+    return all_articles[:n]
 
 
 def color_pct(val):
@@ -278,51 +339,38 @@ elif page == "Mercado General":
 # ══════════════════════════════════════════════════════════════════════════════
 
 elif page == "Noticias":
-    st.header("📰 Noticias por Empresa")
+    st.header("📰 Top 10 Noticias de la Semana")
+    st.caption("Fuentes: Yahoo Finance — tickers del universo de seguimiento")
 
-    available_tickers = df["Ticker"].tolist() if not df.empty else list(TICKERS.keys())
-    ticker_options = [f"{t} – {TICKERS[t]['name']}" for t in available_tickers if t in TICKERS]
-    selected_label = st.selectbox("Seleccioná un instrumento", ticker_options)
-    selected_ticker = selected_label.split(" – ")[0] if selected_label else None
+    with st.spinner("Cargando noticias..."):
+        top_news = fetch_top_news(10)
 
-    if selected_ticker:
-        st.markdown(f"### {selected_ticker} — {TICKERS[selected_ticker]['name']}")
-        with st.spinner("Cargando noticias..."):
-            news = fetch_news(selected_ticker)
+    if not top_news:
+        st.info("No hay noticias disponibles en este momento.")
+    else:
+        for i, article in enumerate(top_news, 1):
+            title    = article["title"]
+            link     = article["link"]
+            pub      = article["publisher"]
+            ts       = article.get("ts")
+            ticker   = article.get("ticker", "")
+            company  = article.get("company", "")
+            date_str = datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M") if ts else ""
 
-        if not news:
-            st.info("No hay noticias disponibles en este momento.")
-        else:
-            for article in news:
-                title = article.get("title", "Sin título")
-                link  = article.get("link", "#")
-                pub   = article.get("publisher", "")
-                ts    = article.get("providerPublishTime", None)
-                date_str = datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M") if ts else ""
-
-                with st.container():
-                    col1, col2 = st.columns([5, 1])
-                    col1.markdown(f"**[{title}]({link})**")
-                    col2.caption(date_str)
+            with st.container():
+                col_num, col_body = st.columns([0.5, 9.5])
+                col_num.markdown(f"### {i}")
+                with col_body:
+                    st.markdown(f"### [{title}]({link})")
+                    meta_parts = []
+                    if ticker:
+                        meta_parts.append(f"🏷️ **{ticker}** — {company}")
                     if pub:
-                        st.caption(f"📡 {pub}")
-                    st.divider()
-
-    st.divider()
-    st.subheader("📋 Resumen de noticias — Mi Cartera")
-    st.caption("Últimas 2 noticias por ticker")
-
-    for ticker in MY_PORTFOLIO:
-        news = fetch_news(ticker)
-        if not news:
-            continue
-        st.markdown(f"**{ticker} — {TICKERS[ticker]['name']}**")
-        for article in news[:2]:
-            title = article.get("title", "Sin título")
-            link  = article.get("link", "#")
-            pub   = article.get("publisher", "")
-            st.markdown(f"- [{title}]({link}) _{pub}_")
-        st.markdown("")
+                        meta_parts.append(f"📡 {pub}")
+                    if date_str:
+                        meta_parts.append(f"🕐 {date_str}")
+                    st.caption("  ·  ".join(meta_parts))
+                st.divider()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -399,10 +447,10 @@ elif page == "Detalle de Ticker":
             st.info("Sin noticias disponibles.")
         else:
             for article in news:
-                title = article.get("title", "Sin título")
-                link  = article.get("link", "#")
-                pub   = article.get("publisher", "")
-                ts    = article.get("providerPublishTime", None)
+                title    = article["title"]
+                link     = article["link"]
+                pub      = article.get("publisher", "")
+                ts       = article.get("ts")
                 date_str = datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M") if ts else ""
                 st.markdown(f"**[{title}]({link})**  \n_{pub} · {date_str}_")
                 st.divider()
