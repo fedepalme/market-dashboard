@@ -157,7 +157,7 @@ df = df_full[df_full["Grupo"].isin(selected_groups)].copy()
 
 def styled_table(dataframe: pd.DataFrame):
     pct_cols = [c for c in ["1S %", "1M %", "YTD %", "1A %"] if c in dataframe.columns]
-    styled = dataframe.style.applymap(color_pct, subset=pct_cols).format(
+    styled = dataframe.style.map(color_pct, subset=pct_cols).format(
         {c: "{:+.2f}%" for c in pct_cols} | {"Precio": "${:,.2f}"},
         na_rep="—",
     )
