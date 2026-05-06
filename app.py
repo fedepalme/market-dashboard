@@ -448,24 +448,103 @@ elif page == "Movers":
         else:
             col_gm, col_pm = st.columns(2, gap="small")
             with col_gm:
-                st.markdown("##### 🟢 Top 10 Ganadoras")
-                movers_table(df_mes.nlargest(10, "1M %").reset_index(drop=True), "1M %")
+                st.markdown("##### 🟢 Top 20 Ganadoras")
+                movers_table(df_mes.nlargest(20, "1M %").reset_index(drop=True), "1M %")
             with col_pm:
-                st.markdown("##### 🔴 Top 10 Perdedoras")
-                movers_table(df_mes.nsmallest(10, "1M %").reset_index(drop=True), "1M %")
+                st.markdown("##### 🔴 Top 20 Perdedoras")
+                movers_table(df_mes.nsmallest(20, "1M %").reset_index(drop=True), "1M %")
 
         st.divider()
 
-        # ── Ranking YTD completo ──────────────────────────────────────────────
-        st.subheader("📊 Ranking YTD — todos los instrumentos")
-        st.caption("Ordenado por rendimiento desde el 1 de enero.")
-        df_ytd = df.dropna(subset=["YTD %"]).sort_values("YTD %", ascending=False)
-        COLS_FULL = ["Ticker", "Empresa", "Grupo", "Precio", "1S %", "1M %", "YTD %", "1A %"]
-        st.dataframe(
-            styled_table(df_ytd[COLS_FULL].reset_index(drop=True)),
-            use_container_width=True,
-            hide_index=True,
-        )
+        # ── Emergentes ────────────────────────────────────────────────────────
+        st.subheader("🌱 Emergentes — Under the radar")
+        st.caption("Compañías de menor perfil con movimientos destacados esta semana y este mes.")
+
+        EMERGENTES = {
+            "PLTR":  "Palantir Technologies",
+            "SNOW":  "Snowflake Inc.",
+            "NET":   "Cloudflare Inc.",
+            "DDOG":  "Datadog Inc.",
+            "CRWD":  "CrowdStrike Holdings",
+            "COIN":  "Coinbase Global Inc.",
+            "APP":   "AppLovin Corporation",
+            "HIMS":  "Hims & Hers Health",
+            "RDDT":  "Reddit Inc.",
+            "RKLB":  "Rocket Lab USA",
+            "ASTS":  "AST SpaceMobile",
+            "ACHR":  "Archer Aviation",
+            "IONQ":  "IonQ Inc. (Quantum Computing)",
+            "OKLO":  "Oklo Inc. (Nuclear Energy)",
+            "SOUN":  "SoundHound AI Inc.",
+            "RXRX":  "Recursion Pharmaceuticals",
+            "CELH":  "Celsius Holdings",
+            "BROS":  "Dutch Bros Inc.",
+            "CAVA":  "CAVA Group Inc.",
+            "AFRM":  "Affirm Holdings",
+            "HOOD":  "Robinhood Markets",
+            "RIVN":  "Rivian Automotive",
+            "JOBY":  "Joby Aviation",
+            "SMCI":  "Super Micro Computer",
+            "MSTR":  "MicroStrategy Inc.",
+            "ARKK":  "ARK Innovation ETF",
+            "ARKG":  "ARK Genomic Revolution ETF",
+        }
+
+        @st.cache_data(ttl=3600, show_spinner=False)
+        def fetch_emergentes_data():
+            end = datetime.now()
+            start = end - timedelta(days=400)
+            result = {}
+            for ticker in EMERGENTES:
+                try:
+                    hist = yf.Ticker(ticker).history(start=start, end=end, auto_adjust=True)
+                    if not hist.empty:
+                        result[ticker] = hist
+                except Exception:
+                    continue
+            return result
+
+        def build_emergentes_df(hist_data: dict, start, end, pct_col: str) -> pd.DataFrame:
+            rows = []
+            for ticker, name in EMERGENTES.items():
+                hist = hist_data.get(ticker)
+                if hist is None or hist.empty:
+                    continue
+                idx = hist.index.tz_localize(None) if hist.index.tz else hist.index
+                idx = idx.normalize()
+                seg = hist[(idx >= pd.Timestamp(start)) & (idx <= pd.Timestamp(end))]
+                if len(seg) < 2:
+                    continue
+                pct = round((seg["Close"].iloc[-1] / seg["Close"].iloc[0] - 1) * 100, 2)
+                price = round(hist["Close"].iloc[-1], 2)
+                rows.append({"Ticker": ticker, "Empresa": name, "Precio": price, pct_col: pct})
+            return pd.DataFrame(rows)
+
+        with st.spinner("Cargando emergentes..."):
+            em_hist = fetch_emergentes_data()
+
+        # Emergentes semanal
+        st.markdown("**📅 Esta semana**")
+        df_em_sem = build_emergentes_df(em_hist, start_week, end_week, "1S %")
+        if not df_em_sem.empty:
+            col_es, col_ep = st.columns(2, gap="small")
+            with col_es:
+                st.markdown("##### 🟢 Top 5 Ganadoras")
+                movers_table(df_em_sem.nlargest(5, "1S %").reset_index(drop=True), "1S %")
+            with col_ep:
+                st.markdown("##### 🔴 Top 5 Perdedoras")
+                movers_table(df_em_sem.nsmallest(5, "1S %").reset_index(drop=True), "1S %")
+
+        st.markdown("**📅 Este mes**")
+        df_em_mes = build_emergentes_df(em_hist, start_month, end_month, "1M %")
+        if not df_em_mes.empty:
+            col_ems, col_emp = st.columns(2, gap="small")
+            with col_ems:
+                st.markdown("##### 🟢 Top 5 Ganadoras")
+                movers_table(df_em_mes.nlargest(5, "1M %").reset_index(drop=True), "1M %")
+            with col_emp:
+                st.markdown("##### 🔴 Top 5 Perdedoras")
+                movers_table(df_em_mes.nsmallest(5, "1M %").reset_index(drop=True), "1M %")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
