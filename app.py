@@ -323,74 +323,74 @@ if page == "Mi Cartera":
 # ══════════════════════════════════════════════════════════════════════════════
 
 elif page == "Movers":
-    st.header("🚀 Movers de la Semana")
-    st.caption("Ranking de movimientos semanales. No es recomendación de compra/venta.")
+    st.header("🚀 Movers")
+    st.caption("Ranking de movimientos por período. No es recomendación de compra/venta.")
 
     if df.empty:
         st.warning("Sin datos disponibles.")
     else:
-        df_movers = df.dropna(subset=["1S %"]).copy()
+        # Columnas compactas para tablas en 2 columnas: sin Grupo, sin YTD en top5
+        COLS_SEMANAL  = ["Ticker", "Empresa", "Precio", "1S %"]
+        COLS_MENSUAL  = ["Ticker", "Empresa", "Precio", "1M %"]
+        COLS_FULL     = ["Ticker", "Empresa", "Grupo", "Precio", "1S %", "1M %", "YTD %", "1A %"]
 
-        col_top, col_bot = st.columns(2, gap="large")
+        # ── Semanal ───────────────────────────────────────────────────────────
+        st.subheader("📅 Movimientos de la Semana")
+        df_sem = df.dropna(subset=["1S %"]).copy()
+        top5_sem  = df_sem.nlargest(5, "1S %")
+        bot5_sem  = df_sem.nsmallest(5, "1S %")
 
-        with col_top:
-            st.subheader("🟢 Top 5 Ganadoras — 1S%")
-            top5 = df_movers.nlargest(5, "1S %")[["Ticker", "Empresa", "Grupo", "Precio", "1S %", "YTD %"]]
+        col_g, col_p = st.columns(2, gap="large")
+        with col_g:
+            st.markdown("##### 🟢 Top 5 Ganadoras")
             st.dataframe(
-                styled_table(top5.reset_index(drop=True)),
+                styled_table(top5_sem[COLS_SEMANAL].reset_index(drop=True)),
                 use_container_width=True,
                 hide_index=True,
             )
-
-        with col_bot:
-            st.subheader("🔴 Top 5 Perdedoras — 1S%")
-            bot5 = df_movers.nsmallest(5, "1S %")[["Ticker", "Empresa", "Grupo", "Precio", "1S %", "YTD %"]]
+        with col_p:
+            st.markdown("##### 🔴 Top 5 Perdedoras")
             st.dataframe(
-                styled_table(bot5.reset_index(drop=True)),
+                styled_table(bot5_sem[COLS_SEMANAL].reset_index(drop=True)),
                 use_container_width=True,
                 hide_index=True,
             )
 
         st.divider()
 
+        # ── Mensual ───────────────────────────────────────────────────────────
+        st.subheader("📅 Movimientos del Mes")
+        df_mes = df.dropna(subset=["1M %"]).copy()
+        top10_mes = df_mes.nlargest(10, "1M %")
+        bot10_mes = df_mes.nsmallest(10, "1M %")
+
+        col_gm, col_pm = st.columns(2, gap="large")
+        with col_gm:
+            st.markdown("##### 🟢 Top 10 Ganadoras")
+            st.dataframe(
+                styled_table(top10_mes[COLS_MENSUAL].reset_index(drop=True)),
+                use_container_width=True,
+                hide_index=True,
+            )
+        with col_pm:
+            st.markdown("##### 🔴 Top 10 Perdedoras")
+            st.dataframe(
+                styled_table(bot10_mes[COLS_MENSUAL].reset_index(drop=True)),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        st.divider()
+
+        # ── Ranking YTD completo ──────────────────────────────────────────────
         st.subheader("📊 Ranking YTD — todos los instrumentos")
         st.caption("Ordenado por rendimiento desde el 1 de enero.")
         df_ytd = df.dropna(subset=["YTD %"]).sort_values("YTD %", ascending=False)
-        display_cols = ["Ticker", "Empresa", "Grupo", "Precio", "1S %", "1M %", "YTD %", "1A %"]
         st.dataframe(
-            styled_table(df_ytd[display_cols].reset_index(drop=True)),
+            styled_table(df_ytd[COLS_FULL].reset_index(drop=True)),
             use_container_width=True,
             hide_index=True,
         )
-
-        st.divider()
-
-        st.subheader("📈 Evolución YTD — Top 5 ganadoras")
-        year_start = f"{datetime.now().year}-01-01"
-        fig2 = go.Figure()
-        for ticker in top5["Ticker"].tolist():
-            hist = hist_map.get(ticker)
-            if hist is None:
-                continue
-            ytd_hist = hist[hist.index >= year_start]["Close"]
-            if ytd_hist.empty:
-                continue
-            normalized = (ytd_hist / ytd_hist.iloc[0]) * 100
-            fig2.add_trace(go.Scatter(
-                x=normalized.index,
-                y=normalized.values,
-                name=f"{ticker}",
-                mode="lines",
-            ))
-        fig2.add_hline(y=100, line_dash="dash", line_color="gray", opacity=0.5)
-        fig2.update_layout(
-            xaxis_title="Fecha",
-            yaxis_title="Rendimiento (base 100)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-            height=380,
-            margin=dict(t=40, b=20),
-        )
-        st.plotly_chart(fig2, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
