@@ -210,7 +210,6 @@ def movers_table(dataframe: pd.DataFrame, pct_col: str):
     """Compact movers table: color en % + anchos controlados, sin scroll horizontal."""
     cols = [c for c in ["Ticker", "Empresa", "Precio", pct_col] if c in dataframe.columns]
     display_df = dataframe[cols].copy()
-
     styled = (
         display_df.style
         .map(color_pct, subset=[pct_col])
@@ -223,6 +222,84 @@ def movers_table(dataframe: pd.DataFrame, pct_col: str):
         pct_col:   st.column_config.TextColumn(pct_col,   width=90),
     }
     st.dataframe(styled, use_container_width=True, hide_index=True, column_config=col_cfg)
+
+
+def movers_table_selectable(dataframe: pd.DataFrame, pct_col: str, key: str) -> str | None:
+    """Same as movers_table but with row selection. Returns selected Ticker or None."""
+    cols = [c for c in ["Ticker", "Empresa", "Precio", pct_col] if c in dataframe.columns]
+    display_df = dataframe[cols].copy()
+    styled = (
+        display_df.style
+        .map(color_pct, subset=[pct_col])
+        .format({"Precio": "${:,.2f}", pct_col: "{:+.2f}%"}, na_rep="—")
+    )
+    col_cfg = {
+        "Ticker":  st.column_config.TextColumn("Ticker",  width=60),
+        "Empresa": st.column_config.TextColumn("Empresa", width=160),
+        "Precio":  st.column_config.TextColumn("Precio",  width=85),
+        pct_col:   st.column_config.TextColumn(pct_col,   width=90),
+    }
+    event = st.dataframe(
+        styled,
+        use_container_width=True,
+        hide_index=True,
+        column_config=col_cfg,
+        on_select="rerun",
+        selection_mode="single-row",
+        key=key,
+    )
+    if event.selection.rows:
+        return dataframe.iloc[event.selection.rows[0]]["Ticker"]
+    return None
+
+
+@st.dialog("📈 Performance — 6 meses", width="large")
+def show_performance_chart(ticker: str, company: str):
+    hist = hist_map.get(ticker)
+    if hist is None:
+        st.warning("Sin datos históricos para este ticker.")
+        return
+
+    cutoff = pd.Timestamp(datetime.now() - timedelta(days=182))
+    if hist.index.tz is not None:
+        cutoff = cutoff.tz_localize("UTC")
+    hist_6m = hist[hist.index >= cutoff]
+
+    if hist_6m.empty:
+        st.warning("Sin datos en los últimos 6 meses.")
+        return
+
+    st.markdown(f"### {ticker} — {company}")
+
+    price_now   = hist_6m["Close"].iloc[-1]
+    price_start = hist_6m["Close"].iloc[0]
+    pct_6m      = (price_now / price_start - 1) * 100
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Precio actual",    f"${price_now:,.2f}")
+    col2.metric("Hace 6 meses",     f"${price_start:,.2f}")
+    col3.metric("Variación 6M",     f"{pct_6m:+.2f}%", delta=f"{pct_6m:+.2f}%")
+
+    fig = go.Figure(go.Candlestick(
+        x=hist_6m.index,
+        open=hist_6m["Open"],
+        high=hist_6m["High"],
+        low=hist_6m["Low"],
+        close=hist_6m["Close"],
+        name=ticker,
+        increasing_line_color="#16a34a",
+        decreasing_line_color="#dc2626",
+    ))
+    fig.update_layout(
+        xaxis_rangeslider_visible=False,
+        height=380,
+        margin=dict(t=20, b=20, l=10, r=10),
+        plot_bgcolor="#1e293b",
+        paper_bgcolor="#1e293b",
+        font_color="#f1f5f9",
+        xaxis=dict(gridcolor="#334155"),
+        yaxis=dict(gridcolor="#334155", tickprefix="$"),
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
@@ -414,15 +491,21 @@ elif page == "Movers":
             with col_g:
                 ganadores = df_sem[df_sem["1S %"] > 0].nlargest(5, "1S %").reset_index(drop=True)
                 st.markdown(f"##### 🟢 Top 5 Ganadoras ({len(ganadores)} con subida)")
+                st.caption("Click en una fila para ver el gráfico")
                 if not ganadores.empty:
-                    movers_table(ganadores, "1S %")
+                    sel = movers_table_selectable(ganadores, "1S %", key="sem_gan")
+                    if sel:
+                        show_performance_chart(sel, TICKERS.get(sel, {}).get("name", sel))
                 else:
                     st.info("Sin ganadoras esta semana.")
             with col_p:
                 perdedores = df_sem[df_sem["1S %"] < 0].nsmallest(5, "1S %").reset_index(drop=True)
                 st.markdown(f"##### 🔴 Top 5 Perdedoras ({len(perdedores)} con baja)")
+                st.caption("Click en una fila para ver el gráfico")
                 if not perdedores.empty:
-                    movers_table(perdedores, "1S %")
+                    sel = movers_table_selectable(perdedores, "1S %", key="sem_per")
+                    if sel:
+                        show_performance_chart(sel, TICKERS.get(sel, {}).get("name", sel))
                 else:
                     st.info("Sin perdedoras esta semana.")
 
@@ -460,15 +543,21 @@ elif page == "Movers":
             with col_gm:
                 gan_mes = df_mes[df_mes["1M %"] > 0].nlargest(20, "1M %").reset_index(drop=True)
                 st.markdown(f"##### 🟢 Top 20 Ganadoras ({len(gan_mes)} con subida)")
+                st.caption("Click en una fila para ver el gráfico")
                 if not gan_mes.empty:
-                    movers_table(gan_mes, "1M %")
+                    sel = movers_table_selectable(gan_mes, "1M %", key="mes_gan")
+                    if sel:
+                        show_performance_chart(sel, TICKERS.get(sel, {}).get("name", sel))
                 else:
                     st.info("Sin ganadoras este mes.")
             with col_pm:
                 per_mes = df_mes[df_mes["1M %"] < 0].nsmallest(20, "1M %").reset_index(drop=True)
                 st.markdown(f"##### 🔴 Top 20 Perdedoras ({len(per_mes)} con baja)")
+                st.caption("Click en una fila para ver el gráfico")
                 if not per_mes.empty:
-                    movers_table(per_mes, "1M %")
+                    sel = movers_table_selectable(per_mes, "1M %", key="mes_per")
+                    if sel:
+                        show_performance_chart(sel, TICKERS.get(sel, {}).get("name", sel))
                 else:
                     st.info("Sin perdedoras este mes.")
 
