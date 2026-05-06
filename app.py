@@ -410,11 +410,13 @@ elif page == "Movers":
         else:
             col_g, col_p = st.columns(2, gap="small")
             with col_g:
-                st.markdown("##### 🟢 Top 5 Ganadoras")
-                movers_table(df_sem.nlargest(5, "1S %").reset_index(drop=True), "1S %")
+                ganadores = df_sem[df_sem["1S %"] > 0].nlargest(5, "1S %").reset_index(drop=True)
+                st.markdown(f"##### 🟢 Top 5 Ganadoras ({len(ganadores)} con subida)")
+                movers_table(ganadores, "1S %") if not ganadores.empty else st.info("Sin ganadoras esta semana.")
             with col_p:
-                st.markdown("##### 🔴 Top 5 Perdedoras")
-                movers_table(df_sem.nsmallest(5, "1S %").reset_index(drop=True), "1S %")
+                perdedores = df_sem[df_sem["1S %"] < 0].nsmallest(5, "1S %").reset_index(drop=True)
+                st.markdown(f"##### 🔴 Top 5 Perdedoras ({len(perdedores)} con baja)")
+                movers_table(perdedores, "1S %") if not perdedores.empty else st.info("Sin perdedoras esta semana.")
 
         st.divider()
 
@@ -448,11 +450,13 @@ elif page == "Movers":
         else:
             col_gm, col_pm = st.columns(2, gap="small")
             with col_gm:
-                st.markdown("##### 🟢 Top 20 Ganadoras")
-                movers_table(df_mes.nlargest(20, "1M %").reset_index(drop=True), "1M %")
+                gan_mes = df_mes[df_mes["1M %"] > 0].nlargest(20, "1M %").reset_index(drop=True)
+                st.markdown(f"##### 🟢 Top 20 Ganadoras ({len(gan_mes)} con subida)")
+                movers_table(gan_mes, "1M %") if not gan_mes.empty else st.info("Sin ganadoras este mes.")
             with col_pm:
-                st.markdown("##### 🔴 Top 20 Perdedoras")
-                movers_table(df_mes.nsmallest(20, "1M %").reset_index(drop=True), "1M %")
+                per_mes = df_mes[df_mes["1M %"] < 0].nsmallest(20, "1M %").reset_index(drop=True)
+                st.markdown(f"##### 🔴 Top 20 Perdedoras ({len(per_mes)} con baja)")
+                movers_table(per_mes, "1M %") if not per_mes.empty else st.info("Sin perdedoras este mes.")
 
         st.divider()
 
@@ -529,22 +533,26 @@ elif page == "Movers":
         if not df_em_sem.empty:
             col_es, col_ep = st.columns(2, gap="small")
             with col_es:
-                st.markdown("##### 🟢 Top 5 Ganadoras")
-                movers_table(df_em_sem.nlargest(5, "1S %").reset_index(drop=True), "1S %")
+                em_gan_sem = df_em_sem[df_em_sem["1S %"] > 0].nlargest(5, "1S %").reset_index(drop=True)
+                st.markdown(f"##### 🟢 Top 5 Ganadoras ({len(em_gan_sem)} con subida)")
+                movers_table(em_gan_sem, "1S %") if not em_gan_sem.empty else st.info("Sin ganadoras.")
             with col_ep:
-                st.markdown("##### 🔴 Top 5 Perdedoras")
-                movers_table(df_em_sem.nsmallest(5, "1S %").reset_index(drop=True), "1S %")
+                em_per_sem = df_em_sem[df_em_sem["1S %"] < 0].nsmallest(5, "1S %").reset_index(drop=True)
+                st.markdown(f"##### 🔴 Top 5 Perdedoras ({len(em_per_sem)} con baja)")
+                movers_table(em_per_sem, "1S %") if not em_per_sem.empty else st.info("Sin perdedoras.")
 
         st.markdown("**📅 Este mes**")
         df_em_mes = build_emergentes_df(em_hist, start_month, end_month, "1M %")
         if not df_em_mes.empty:
             col_ems, col_emp = st.columns(2, gap="small")
             with col_ems:
-                st.markdown("##### 🟢 Top 10 Ganadoras")
-                movers_table(df_em_mes.nlargest(10, "1M %").reset_index(drop=True), "1M %")
+                em_gan_mes = df_em_mes[df_em_mes["1M %"] > 0].nlargest(10, "1M %").reset_index(drop=True)
+                st.markdown(f"##### 🟢 Top 10 Ganadoras ({len(em_gan_mes)} con subida)")
+                movers_table(em_gan_mes, "1M %") if not em_gan_mes.empty else st.info("Sin ganadoras.")
             with col_emp:
-                st.markdown("##### 🔴 Top 10 Perdedoras")
-                movers_table(df_em_mes.nsmallest(10, "1M %").reset_index(drop=True), "1M %")
+                em_per_mes = df_em_mes[df_em_mes["1M %"] < 0].nsmallest(10, "1M %").reset_index(drop=True)
+                st.markdown(f"##### 🔴 Top 10 Perdedoras ({len(em_per_mes)} con baja)")
+                movers_table(em_per_mes, "1M %") if not em_per_mes.empty else st.info("Sin perdedoras.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
