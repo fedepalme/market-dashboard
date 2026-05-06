@@ -207,19 +207,22 @@ def color_pct(val):
 
 
 def movers_table(dataframe: pd.DataFrame, pct_col: str):
-    """Render a compact movers table with fixed column widths — no horizontal scroll."""
-    col_cfg = {
-        "Ticker":  st.column_config.TextColumn("Ticker",  width=70),
-        "Empresa": st.column_config.TextColumn("Empresa", width=180),
-        "Precio":  st.column_config.NumberColumn("Precio", format="$%.2f", width=90),
-        pct_col:   st.column_config.NumberColumn(pct_col, format="%.2f%%", width=80),
-    }
-    st.dataframe(
-        dataframe[[c for c in ["Ticker", "Empresa", "Precio", pct_col] if c in dataframe.columns]],
-        use_container_width=True,
-        hide_index=True,
-        column_config=col_cfg,
+    """Compact movers table: color en % + anchos controlados, sin scroll horizontal."""
+    cols = [c for c in ["Ticker", "Empresa", "Precio", pct_col] if c in dataframe.columns]
+    display_df = dataframe[cols].copy()
+
+    styled = (
+        display_df.style
+        .map(color_pct, subset=[pct_col])
+        .format({"Precio": "${:,.2f}", pct_col: "{:+.2f}%"}, na_rep="—")
     )
+    col_cfg = {
+        "Ticker":  st.column_config.TextColumn("Ticker",  width="small"),
+        "Empresa": st.column_config.TextColumn("Empresa", width="medium"),
+        "Precio":  st.column_config.TextColumn("Precio",  width="small"),
+        pct_col:   st.column_config.TextColumn(pct_col,   width="small"),
+    }
+    st.dataframe(styled, use_container_width=True, hide_index=True, column_config=col_cfg)
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
@@ -398,7 +401,7 @@ elif page == "Movers":
         if df_sem.empty:
             st.info("Sin datos para el período seleccionado.")
         else:
-            col_g, col_p = st.columns(2, gap="large")
+            col_g, col_p = st.columns(2, gap="small")
             with col_g:
                 st.markdown("##### 🟢 Top 5 Ganadoras")
                 movers_table(df_sem.nlargest(5, "1S %").reset_index(drop=True), "1S %")
@@ -436,7 +439,7 @@ elif page == "Movers":
         if df_mes.empty:
             st.info("Sin datos para el mes seleccionado.")
         else:
-            col_gm, col_pm = st.columns(2, gap="large")
+            col_gm, col_pm = st.columns(2, gap="small")
             with col_gm:
                 st.markdown("##### 🟢 Top 10 Ganadoras")
                 movers_table(df_mes.nlargest(10, "1M %").reset_index(drop=True), "1M %")
