@@ -220,7 +220,7 @@ with st.sidebar:
     st.markdown("**Navegación**")
     page = st.radio(
         "",
-        ["Mi Cartera", "Mercado General", "Noticias", "Detalle de Ticker"],
+        ["Mi Cartera", "Movers", "Mercado General", "Noticias", "Detalle de Ticker"],
         label_visibility="collapsed",
     )
 
@@ -316,6 +316,81 @@ if page == "Mi Cartera":
             margin=dict(t=40, b=20),
         )
         st.plotly_chart(fig, use_container_width=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: MOVERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+elif page == "Movers":
+    st.header("🚀 Movers de la Semana")
+    st.caption("Ranking de movimientos semanales. No es recomendación de compra/venta.")
+
+    if df.empty:
+        st.warning("Sin datos disponibles.")
+    else:
+        df_movers = df.dropna(subset=["1S %"]).copy()
+
+        col_top, col_bot = st.columns(2, gap="large")
+
+        with col_top:
+            st.subheader("🟢 Top 5 Ganadoras — 1S%")
+            top5 = df_movers.nlargest(5, "1S %")[["Ticker", "Empresa", "Grupo", "Precio", "1S %", "YTD %"]]
+            st.dataframe(
+                styled_table(top5.reset_index(drop=True)),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        with col_bot:
+            st.subheader("🔴 Top 5 Perdedoras — 1S%")
+            bot5 = df_movers.nsmallest(5, "1S %")[["Ticker", "Empresa", "Grupo", "Precio", "1S %", "YTD %"]]
+            st.dataframe(
+                styled_table(bot5.reset_index(drop=True)),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        st.divider()
+
+        st.subheader("📊 Ranking YTD — todos los instrumentos")
+        st.caption("Ordenado por rendimiento desde el 1 de enero.")
+        df_ytd = df.dropna(subset=["YTD %"]).sort_values("YTD %", ascending=False)
+        display_cols = ["Ticker", "Empresa", "Grupo", "Precio", "1S %", "1M %", "YTD %", "1A %"]
+        st.dataframe(
+            styled_table(df_ytd[display_cols].reset_index(drop=True)),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.divider()
+
+        st.subheader("📈 Evolución YTD — Top 5 ganadoras")
+        year_start = f"{datetime.now().year}-01-01"
+        fig2 = go.Figure()
+        for ticker in top5["Ticker"].tolist():
+            hist = hist_map.get(ticker)
+            if hist is None:
+                continue
+            ytd_hist = hist[hist.index >= year_start]["Close"]
+            if ytd_hist.empty:
+                continue
+            normalized = (ytd_hist / ytd_hist.iloc[0]) * 100
+            fig2.add_trace(go.Scatter(
+                x=normalized.index,
+                y=normalized.values,
+                name=f"{ticker}",
+                mode="lines",
+            ))
+        fig2.add_hline(y=100, line_dash="dash", line_color="gray", opacity=0.5)
+        fig2.update_layout(
+            xaxis_title="Fecha",
+            yaxis_title="Rendimiento (base 100)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+            height=380,
+            margin=dict(t=40, b=20),
+        )
+        st.plotly_chart(fig2, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
