@@ -217,10 +217,10 @@ def movers_table(dataframe: pd.DataFrame, pct_col: str):
         .format({"Precio": "${:,.2f}", pct_col: "{:+.2f}%"}, na_rep="—")
     )
     col_cfg = {
-        "Ticker":  st.column_config.TextColumn("Ticker",  width="small"),
-        "Empresa": st.column_config.TextColumn("Empresa", width="medium"),
-        "Precio":  st.column_config.TextColumn("Precio",  width="small"),
-        pct_col:   st.column_config.TextColumn(pct_col,   width="small"),
+        "Ticker":  st.column_config.TextColumn("Ticker",  width=60),
+        "Empresa": st.column_config.TextColumn("Empresa", width=160),
+        "Precio":  st.column_config.TextColumn("Precio",  width=85),
+        pct_col:   st.column_config.TextColumn(pct_col,   width=90),
     }
     st.dataframe(styled, use_container_width=True, hide_index=True, column_config=col_cfg)
 
@@ -342,6 +342,13 @@ if page == "Mi Cartera":
 # ══════════════════════════════════════════════════════════════════════════════
 
 elif page == "Movers":
+    st.markdown("""
+    <style>
+    div[data-testid="stDataFrame"] iframe { font-size: 0.78rem !important; }
+    div[data-testid="stDataFrame"] div[class*="dvn-scroller"] * { font-size: 0.78rem !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.header("🚀 Movers")
     st.caption("Ranking de movimientos por período. No es recomendación de compra/venta.")
 
