@@ -206,6 +206,22 @@ def color_pct(val):
     return f"color: {color}; font-weight: 600"
 
 
+def movers_table(dataframe: pd.DataFrame, pct_col: str):
+    """Render a compact movers table with fixed column widths — no horizontal scroll."""
+    col_cfg = {
+        "Ticker":  st.column_config.TextColumn("Ticker",  width=70),
+        "Empresa": st.column_config.TextColumn("Empresa", width=180),
+        "Precio":  st.column_config.NumberColumn("Precio", format="$%.2f", width=90),
+        pct_col:   st.column_config.NumberColumn(pct_col, format="%.2f%%", width=80),
+    }
+    st.dataframe(
+        dataframe[[c for c in ["Ticker", "Empresa", "Precio", pct_col] if c in dataframe.columns]],
+        use_container_width=True,
+        hide_index=True,
+        column_config=col_cfg,
+    )
+
+
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -384,16 +400,10 @@ elif page == "Movers":
             col_g, col_p = st.columns(2, gap="large")
             with col_g:
                 st.markdown("##### 🟢 Top 5 Ganadoras")
-                st.dataframe(
-                    styled_table(df_sem.nlargest(5, "1S %").reset_index(drop=True)),
-                    use_container_width=True, hide_index=True,
-                )
+                movers_table(df_sem.nlargest(5, "1S %").reset_index(drop=True), "1S %")
             with col_p:
                 st.markdown("##### 🔴 Top 5 Perdedoras")
-                st.dataframe(
-                    styled_table(df_sem.nsmallest(5, "1S %").reset_index(drop=True)),
-                    use_container_width=True, hide_index=True,
-                )
+                movers_table(df_sem.nsmallest(5, "1S %").reset_index(drop=True), "1S %")
 
         st.divider()
 
@@ -428,16 +438,10 @@ elif page == "Movers":
             col_gm, col_pm = st.columns(2, gap="large")
             with col_gm:
                 st.markdown("##### 🟢 Top 10 Ganadoras")
-                st.dataframe(
-                    styled_table(df_mes.nlargest(10, "1M %").reset_index(drop=True)),
-                    use_container_width=True, hide_index=True,
-                )
+                movers_table(df_mes.nlargest(10, "1M %").reset_index(drop=True), "1M %")
             with col_pm:
                 st.markdown("##### 🔴 Top 10 Perdedoras")
-                st.dataframe(
-                    styled_table(df_mes.nsmallest(10, "1M %").reset_index(drop=True)),
-                    use_container_width=True, hide_index=True,
-                )
+                movers_table(df_mes.nsmallest(10, "1M %").reset_index(drop=True), "1M %")
 
         st.divider()
 
