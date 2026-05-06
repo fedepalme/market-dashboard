@@ -540,11 +540,11 @@ elif page == "Movers":
         if not df_em_mes.empty:
             col_ems, col_emp = st.columns(2, gap="small")
             with col_ems:
-                st.markdown("##### 🟢 Top 5 Ganadoras")
-                movers_table(df_em_mes.nlargest(5, "1M %").reset_index(drop=True), "1M %")
+                st.markdown("##### 🟢 Top 10 Ganadoras")
+                movers_table(df_em_mes.nlargest(10, "1M %").reset_index(drop=True), "1M %")
             with col_emp:
-                st.markdown("##### 🔴 Top 5 Perdedoras")
-                movers_table(df_em_mes.nsmallest(5, "1M %").reset_index(drop=True), "1M %")
+                st.markdown("##### 🔴 Top 10 Perdedoras")
+                movers_table(df_em_mes.nsmallest(10, "1M %").reset_index(drop=True), "1M %")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
