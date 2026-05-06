@@ -299,28 +299,6 @@ elif page == "Mercado General":
     if df.empty:
         st.warning("Sin datos para los grupos seleccionados.")
     else:
-        # Heatmap (1S %)
-        st.subheader("Heatmap semanal (1S %)")
-        hm_df = df.dropna(subset=["1S %"]).copy()
-        hm_df["Label"] = hm_df["Ticker"] + "<br>" + hm_df["1S %"].map(lambda x: f"{x:+.2f}%")
-
-        fig_hm = px.treemap(
-            hm_df,
-            path=["Grupo", "Ticker"],
-            values=hm_df["Precio"],
-            color="1S %",
-            color_continuous_scale=["#dc2626", "#f97316", "#e5e7eb", "#4ade80", "#16a34a"],
-            color_continuous_midpoint=0,
-            custom_data=["Empresa", "1S %", "Precio"],
-        )
-        fig_hm.update_traces(
-            hovertemplate="<b>%{label}</b><br>%{customdata[0]}<br>Precio: $%{customdata[2]:,.2f}<br>1S: %{customdata[1]:+.2f}%<extra></extra>"
-        )
-        fig_hm.update_layout(height=500, margin=dict(t=30, b=10))
-        st.plotly_chart(fig_hm, use_container_width=True)
-
-        st.divider()
-
         # Full table grouped
         st.subheader("Tabla completa")
         display_cols = ["Ticker", "Empresa", "Grupo", "Precio", "1S %", "1M %", "YTD %", "1A %"]
