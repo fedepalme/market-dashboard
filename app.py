@@ -329,56 +329,115 @@ elif page == "Movers":
     if df.empty:
         st.warning("Sin datos disponibles.")
     else:
-        # Columnas compactas para tablas en 2 columnas: sin Grupo, sin YTD en top5
-        COLS_SEMANAL  = ["Ticker", "Empresa", "Precio", "1S %"]
-        COLS_MENSUAL  = ["Ticker", "Empresa", "Precio", "1M %"]
-        COLS_FULL     = ["Ticker", "Empresa", "Grupo", "Precio", "1S %", "1M %", "YTD %", "1A %"]
+        MONTH_NAMES = {
+            1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+            5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+            9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre",
+        }
+
+        def period_return(ticker: str, start, end) -> float | None:
+            hist = hist_map.get(ticker)
+            if hist is None or hist.empty:
+                return None
+            import numpy as np
+            idx_dates = hist.index.normalize()
+            start_ts = pd.Timestamp(start)
+            end_ts   = pd.Timestamp(end)
+            segment  = hist[(idx_dates >= start_ts) & (idx_dates <= end_ts)]
+            if len(segment) < 2:
+                return None
+            return round((segment["Close"].iloc[-1] / segment["Close"].iloc[0] - 1) * 100, 2)
+
+        def build_movers_df(start, end, pct_col: str) -> pd.DataFrame:
+            rows = []
+            for ticker, meta in TICKERS.items():
+                if selected_groups and meta["group"] not in selected_groups:
+                    continue
+                pct = period_return(ticker, start, end)
+                if pct is None:
+                    continue
+                price = hist_map[ticker]["Close"].iloc[-1] if ticker in hist_map else None
+                rows.append({
+                    "Ticker":  ticker,
+                    "Empresa": meta["name"],
+                    "Precio":  round(price, 2) if price else None,
+                    pct_col:   pct,
+                })
+            return pd.DataFrame(rows)
 
         # ── Semanal ───────────────────────────────────────────────────────────
-        st.subheader("📅 Movimientos de la Semana")
-        df_sem = df.dropna(subset=["1S %"]).copy()
-        top5_sem  = df_sem.nlargest(5, "1S %")
-        bot5_sem  = df_sem.nsmallest(5, "1S %")
+        st.subheader("📅 Semana")
+        end_week = st.date_input(
+            "Ver semana hasta:",
+            value=datetime.now().date(),
+            max_value=datetime.now().date(),
+            key="week_end",
+        )
+        start_week = end_week - timedelta(days=7)
+        st.caption(f"Período: {start_week.strftime('%d/%m/%Y')} → {end_week.strftime('%d/%m/%Y')}")
 
-        col_g, col_p = st.columns(2, gap="large")
-        with col_g:
-            st.markdown("##### 🟢 Top 5 Ganadoras")
-            st.dataframe(
-                styled_table(top5_sem[COLS_SEMANAL].reset_index(drop=True)),
-                use_container_width=True,
-                hide_index=True,
-            )
-        with col_p:
-            st.markdown("##### 🔴 Top 5 Perdedoras")
-            st.dataframe(
-                styled_table(bot5_sem[COLS_SEMANAL].reset_index(drop=True)),
-                use_container_width=True,
-                hide_index=True,
-            )
+        df_sem = build_movers_df(start_week, end_week, "1S %")
+
+        if df_sem.empty:
+            st.info("Sin datos para el período seleccionado.")
+        else:
+            col_g, col_p = st.columns(2, gap="large")
+            with col_g:
+                st.markdown("##### 🟢 Top 5 Ganadoras")
+                st.dataframe(
+                    styled_table(df_sem.nlargest(5, "1S %").reset_index(drop=True)),
+                    use_container_width=True, hide_index=True,
+                )
+            with col_p:
+                st.markdown("##### 🔴 Top 5 Perdedoras")
+                st.dataframe(
+                    styled_table(df_sem.nsmallest(5, "1S %").reset_index(drop=True)),
+                    use_container_width=True, hide_index=True,
+                )
 
         st.divider()
 
-        # ── Mensual ───────────────────────────────────────────────────────────
-        st.subheader("📅 Movimientos del Mes")
-        df_mes = df.dropna(subset=["1M %"]).copy()
-        top10_mes = df_mes.nlargest(10, "1M %")
-        bot10_mes = df_mes.nsmallest(10, "1M %")
+        # ── Mensual (mes cerrado) ─────────────────────────────────────────────
+        st.subheader("📅 Mes cerrado")
 
-        col_gm, col_pm = st.columns(2, gap="large")
-        with col_gm:
-            st.markdown("##### 🟢 Top 10 Ganadoras")
-            st.dataframe(
-                styled_table(top10_mes[COLS_MENSUAL].reset_index(drop=True)),
-                use_container_width=True,
-                hide_index=True,
-            )
-        with col_pm:
-            st.markdown("##### 🔴 Top 10 Perdedoras")
-            st.dataframe(
-                styled_table(bot10_mes[COLS_MENSUAL].reset_index(drop=True)),
-                use_container_width=True,
-                hide_index=True,
-            )
+        # Build list of closed months (up to 13 months back, excluding current month)
+        today = datetime.now()
+        closed_months = []
+        for i in range(1, 14):
+            d = (today.replace(day=1) - timedelta(days=i * 28)).replace(day=1)
+            closed_months.append(d)
+        closed_months = sorted(set(
+            m.replace(day=1) for m in closed_months if m < today.replace(day=1)
+        ), reverse=True)
+        month_labels = [f"{MONTH_NAMES[m.month]} {m.year}" for m in closed_months]
+
+        selected_month_label = st.selectbox("Seleccioná el mes:", month_labels, key="month_sel")
+        selected_month = closed_months[month_labels.index(selected_month_label)]
+
+        import calendar
+        last_day = calendar.monthrange(selected_month.year, selected_month.month)[1]
+        start_month = selected_month.date()
+        end_month   = selected_month.replace(day=last_day).date()
+        st.caption(f"Período: {start_month.strftime('%d/%m/%Y')} → {end_month.strftime('%d/%m/%Y')}")
+
+        df_mes = build_movers_df(start_month, end_month, "1M %")
+
+        if df_mes.empty:
+            st.info("Sin datos para el mes seleccionado.")
+        else:
+            col_gm, col_pm = st.columns(2, gap="large")
+            with col_gm:
+                st.markdown("##### 🟢 Top 10 Ganadoras")
+                st.dataframe(
+                    styled_table(df_mes.nlargest(10, "1M %").reset_index(drop=True)),
+                    use_container_width=True, hide_index=True,
+                )
+            with col_pm:
+                st.markdown("##### 🔴 Top 10 Perdedoras")
+                st.dataframe(
+                    styled_table(df_mes.nsmallest(10, "1M %").reset_index(drop=True)),
+                    use_container_width=True, hide_index=True,
+                )
 
         st.divider()
 
@@ -386,6 +445,7 @@ elif page == "Movers":
         st.subheader("📊 Ranking YTD — todos los instrumentos")
         st.caption("Ordenado por rendimiento desde el 1 de enero.")
         df_ytd = df.dropna(subset=["YTD %"]).sort_values("YTD %", ascending=False)
+        COLS_FULL = ["Ticker", "Empresa", "Grupo", "Precio", "1S %", "1M %", "YTD %", "1A %"]
         st.dataframe(
             styled_table(df_ytd[COLS_FULL].reset_index(drop=True)),
             use_container_width=True,
