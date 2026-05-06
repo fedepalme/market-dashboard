@@ -206,44 +206,35 @@ def color_pct(val):
     return f"color: {color}; font-weight: 600"
 
 
+_MOVERS_COL_CFG = lambda pct_col: {
+    "Ticker":  st.column_config.TextColumn("Ticker",  width=50),
+    "Empresa": st.column_config.TextColumn("Empresa", width=130),
+    "Precio":  st.column_config.TextColumn("Precio",  width=72),
+    pct_col:   st.column_config.TextColumn(pct_col,   width=78),
+}
+
+def _movers_styled(dataframe: pd.DataFrame, pct_col: str):
+    cols = [c for c in ["Ticker", "Empresa", "Precio", pct_col] if c in dataframe.columns]
+    return (
+        dataframe[cols].style
+        .map(color_pct, subset=[pct_col])
+        .format({"Precio": "${:,.2f}", pct_col: "{:+.2f}%"}, na_rep="—")
+    )
+
 def movers_table(dataframe: pd.DataFrame, pct_col: str):
-    """Compact movers table: color en % + anchos controlados, sin scroll horizontal."""
-    cols = [c for c in ["Ticker", "Empresa", "Precio", pct_col] if c in dataframe.columns]
-    display_df = dataframe[cols].copy()
-    styled = (
-        display_df.style
-        .map(color_pct, subset=[pct_col])
-        .format({"Precio": "${:,.2f}", pct_col: "{:+.2f}%"}, na_rep="—")
-    )
-    col_cfg = {
-        "Ticker":  st.column_config.TextColumn("Ticker",  width=60),
-        "Empresa": st.column_config.TextColumn("Empresa", width=160),
-        "Precio":  st.column_config.TextColumn("Precio",  width=85),
-        pct_col:   st.column_config.TextColumn(pct_col,   width=90),
-    }
-    st.dataframe(styled, use_container_width=True, hide_index=True, column_config=col_cfg)
-
-
-def movers_table_selectable(dataframe: pd.DataFrame, pct_col: str, key: str) -> str | None:
-    """Same as movers_table but with row selection. Returns selected Ticker or None."""
-    cols = [c for c in ["Ticker", "Empresa", "Precio", pct_col] if c in dataframe.columns]
-    display_df = dataframe[cols].copy()
-    styled = (
-        display_df.style
-        .map(color_pct, subset=[pct_col])
-        .format({"Precio": "${:,.2f}", pct_col: "{:+.2f}%"}, na_rep="—")
-    )
-    col_cfg = {
-        "Ticker":  st.column_config.TextColumn("Ticker",  width=60),
-        "Empresa": st.column_config.TextColumn("Empresa", width=160),
-        "Precio":  st.column_config.TextColumn("Precio",  width=85),
-        pct_col:   st.column_config.TextColumn(pct_col,   width=90),
-    }
-    event = st.dataframe(
-        styled,
+    st.dataframe(
+        _movers_styled(dataframe, pct_col),
         use_container_width=True,
         hide_index=True,
-        column_config=col_cfg,
+        column_config=_MOVERS_COL_CFG(pct_col),
+    )
+
+def movers_table_selectable(dataframe: pd.DataFrame, pct_col: str, key: str) -> str | None:
+    event = st.dataframe(
+        _movers_styled(dataframe, pct_col),
+        use_container_width=True,
+        hide_index=True,
+        column_config=_MOVERS_COL_CFG(pct_col),
         on_select="rerun",
         selection_mode="single-row",
         key=key,
@@ -423,8 +414,10 @@ if page == "Mi Cartera":
 elif page == "Movers":
     st.markdown("""
     <style>
-    div[data-testid="stDataFrame"] iframe { font-size: 0.78rem !important; }
-    div[data-testid="stDataFrame"] div[class*="dvn-scroller"] * { font-size: 0.78rem !important; }
+    div[data-testid="stDataFrame"] div[class*="dvn-scroller"] * { font-size: 0.75rem !important; }
+    div[data-testid="stDataFrame"] .ag-cell { font-size: 0.75rem !important; padding: 2px 6px !important; }
+    div[data-testid="stDataFrame"] .ag-header-cell-label { font-size: 0.73rem !important; }
+    div[data-testid="stDataFrame"] .ag-row { min-height: 28px !important; height: 28px !important; }
     </style>
     """, unsafe_allow_html=True)
 
