@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+from deep_translator import GoogleTranslator
 
 st.set_page_config(
     page_title="Market Weekly Dashboard",
@@ -102,8 +103,8 @@ def fetch_all_data():
 
 def _parse_article(article: dict) -> dict | None:
     """Normalize yfinance news article across different API versions."""
-    # New yfinance structure: article may have nested 'content'
     content = article.get("content", {})
+
     title = (
         article.get("title")
         or content.get("title")
@@ -122,6 +123,13 @@ def _parse_article(article: dict) -> dict | None:
         or content.get("provider", {}).get("displayName", "")
         or ""
     )
+    summary = (
+        article.get("summary")
+        or content.get("summary")
+        or content.get("description")
+        or content.get("body", "")[:300]
+        or ""
+    )
     ts = article.get("providerPublishTime") or article.get("pubDate") or None
     if isinstance(ts, str):
         try:
@@ -130,7 +138,17 @@ def _parse_article(article: dict) -> dict | None:
             ts = None
     if not title or not link:
         return None
-    return {"title": title, "link": link, "publisher": publisher, "ts": ts}
+    return {"title": title, "summary": summary, "link": link, "publisher": publisher, "ts": ts}
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _translate(text: str) -> str:
+    if not text or not text.strip():
+        return text
+    try:
+        return GoogleTranslator(source="auto", target="es").translate(text[:4000])
+    except Exception:
+        return text
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -145,12 +163,13 @@ def fetch_news(ticker: str) -> list[dict]:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_top_news(n: int = 10) -> list[dict]:
-    """Aggregate news from key tickers, deduplicate, return top-n by date."""
-    key_tickers = MY_PORTFOLIO + ["NVDA", "MSFT", "GOOGL", "AMZN", "TSLA",
-                                   "JPM", "BRK.B", "NFLX", "DIS", "QQQ", "SPY"]
+    """Aggregate news across all tickers, max 2 per ticker, return top-n by date."""
+    all_tickers = list(TICKERS.keys())
     seen_titles: set[str] = set()
+    per_ticker: dict[str, int] = {}
     all_articles: list[dict] = []
-    for ticker in key_tickers:
+
+    for ticker in all_tickers:
         try:
             raw = yf.Ticker(ticker).news or []
             for a in raw:
@@ -160,12 +179,16 @@ def fetch_top_news(n: int = 10) -> list[dict]:
                 key = parsed["title"].lower().strip()[:80]
                 if key in seen_titles:
                     continue
+                if per_ticker.get(ticker, 0) >= 2:
+                    continue
                 seen_titles.add(key)
+                per_ticker[ticker] = per_ticker.get(ticker, 0) + 1
                 parsed["ticker"] = ticker
                 parsed["company"] = TICKERS.get(ticker, {}).get("name", ticker)
                 all_articles.append(parsed)
         except Exception:
             continue
+
     all_articles.sort(key=lambda x: x.get("ts") or 0, reverse=True)
     return all_articles[:n]
 
@@ -317,37 +340,68 @@ elif page == "Mercado General":
 # ══════════════════════════════════════════════════════════════════════════════
 
 elif page == "Noticias":
-    st.header("📰 Top 10 Noticias de la Semana")
-    st.caption("Fuentes: Yahoo Finance — tickers del universo de seguimiento")
+    today_es = datetime.now().strftime("%-d de %B de %Y").lower()
+    months_es = {
+        "january": "enero", "february": "febrero", "march": "marzo",
+        "april": "abril", "may": "mayo", "june": "junio",
+        "july": "julio", "august": "agosto", "september": "septiembre",
+        "october": "octubre", "november": "noviembre", "december": "diciembre",
+    }
+    for en, es in months_es.items():
+        today_es = today_es.replace(en, es)
 
-    with st.spinner("Cargando noticias..."):
+    st.markdown(f"## 📰 Diario de Mercado")
+    st.markdown(f"**{today_es.capitalize()}** · Fuente: Yahoo Finance")
+    st.divider()
+
+    with st.spinner("Cargando y traduciendo noticias..."):
         top_news = fetch_top_news(10)
 
     if not top_news:
         st.info("No hay noticias disponibles en este momento.")
     else:
         for i, article in enumerate(top_news, 1):
-            title    = article["title"]
-            link     = article["link"]
-            pub      = article["publisher"]
-            ts       = article.get("ts")
-            ticker   = article.get("ticker", "")
-            company  = article.get("company", "")
-            date_str = datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M") if ts else ""
+            raw_title   = article["title"]
+            raw_summary = article.get("summary", "")
+            link        = article["link"]
+            pub         = article.get("publisher", "")
+            ts          = article.get("ts")
+            ticker      = article.get("ticker", "")
+            company     = article.get("company", "")
+            date_str    = datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M") if ts else ""
+
+            title   = _translate(raw_title)
+            summary = _translate(raw_summary) if raw_summary else ""
 
             with st.container():
-                col_num, col_body = st.columns([0.5, 9.5])
-                col_num.markdown(f"### {i}")
-                with col_body:
-                    st.markdown(f"### [{title}]({link})")
-                    meta_parts = []
-                    if ticker:
-                        meta_parts.append(f"🏷️ **{ticker}** — {company}")
-                    if pub:
-                        meta_parts.append(f"📡 {pub}")
-                    if date_str:
-                        meta_parts.append(f"🕐 {date_str}")
-                    st.caption("  ·  ".join(meta_parts))
+                # Ticker badge + fecha
+                badge_col, date_col = st.columns([3, 2])
+                if ticker:
+                    badge_col.markdown(f"🏷️ `{ticker}` &nbsp; {company}")
+                date_col.markdown(
+                    f"<div style='text-align:right; color:#94a3b8; font-size:0.85em'>"
+                    f"📡 {pub} &nbsp;·&nbsp; 🕐 {date_str}</div>",
+                    unsafe_allow_html=True,
+                )
+
+                # Título
+                st.markdown(f"### {i}. {title}")
+
+                # Resumen
+                if summary:
+                    st.markdown(
+                        f"<p style='color:#cbd5e1; font-size:0.95em; line-height:1.6'>{summary}</p>",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.caption("_Resumen no disponible para esta nota._")
+
+                # Leer más
+                st.markdown(
+                    f"<a href='{link}' target='_blank' style='color:#4ade80; font-weight:600'>"
+                    f"Leer nota completa →</a>",
+                    unsafe_allow_html=True,
+                )
                 st.divider()
 
 
