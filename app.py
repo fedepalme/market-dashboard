@@ -355,11 +355,12 @@ elif page == "Movers":
             hist = hist_map.get(ticker)
             if hist is None or hist.empty:
                 return None
-            import numpy as np
-            idx_dates = hist.index.normalize()
-            start_ts = pd.Timestamp(start)
-            end_ts   = pd.Timestamp(end)
-            segment  = hist[(idx_dates >= start_ts) & (idx_dates <= end_ts)]
+            # Normalize index to date-only, stripping timezone
+            idx_dates = hist.index.tz_localize(None) if hist.index.tz is not None else hist.index
+            idx_dates = idx_dates.normalize()
+            start_ts  = pd.Timestamp(start)
+            end_ts    = pd.Timestamp(end)
+            segment   = hist[(idx_dates >= start_ts) & (idx_dates <= end_ts)]
             if len(segment) < 2:
                 return None
             return round((segment["Close"].iloc[-1] / segment["Close"].iloc[0] - 1) * 100, 2)
