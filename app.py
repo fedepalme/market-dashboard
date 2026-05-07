@@ -59,11 +59,13 @@ TICKERS = {
     "UUP":     {"name": "US Dollar Index ETF (≈DXY)",          "group": "Macro"},
     "USO":     {"name": "United States Oil Fund (≈WTI)",       "group": "Macro"},
     "BTC-USD": {"name": "Bitcoin",                             "group": "Macro"},
+    # Emergentes (en cartera)
+    "RKLB":    {"name": "Rocket Lab USA",                      "group": "Emergentes"},
 }
 
-MY_PORTFOLIO = ["SPY", "AAPL", "KO", "XLK", "META", "GOLD"]
+MY_PORTFOLIO = ["SPY", "AAPL", "KO", "XLK", "META", "GOLD", "XLV", "JPM", "BAC", "RKLB"]
 
-GROUP_ORDER = ["Mi Cartera", "Tecnología", "Top 20", "Macro"]
+GROUP_ORDER = ["Mi Cartera", "Tecnología", "Top 20", "Macro", "Emergentes"]
 
 # ── Data fetching ──────────────────────────────────────────────────────────────
 
