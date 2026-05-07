@@ -52,6 +52,9 @@ TICKERS = {
     "MCD":     {"name": "McDonald's Corporation",              "group": "Top 20"},
     "GLD":     {"name": "SPDR Gold Shares ETF",                "group": "Top 20"},
     "TLT":     {"name": "iShares 20+ Year Treasury Bond ETF",  "group": "Top 20"},
+    "XLV":     {"name": "Health Care Select Sector SPDR",      "group": "Top 20"},
+    "XLE":     {"name": "Energy Select Sector SPDR",           "group": "Top 20"},
+    "IHI":     {"name": "iShares U.S. Medical Devices ETF",    "group": "Top 20"},
     # Macro
     "UUP":     {"name": "US Dollar Index ETF (≈DXY)",          "group": "Macro"},
     "USO":     {"name": "United States Oil Fund (≈WTI)",       "group": "Macro"},
