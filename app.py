@@ -59,8 +59,12 @@ TICKERS = {
     "UUP":     {"name": "US Dollar Index ETF (≈DXY)",          "group": "Macro"},
     "USO":     {"name": "United States Oil Fund (≈WTI)",       "group": "Macro"},
     "BTC-USD": {"name": "Bitcoin",                             "group": "Macro"},
-    # Emergentes (en cartera)
+    # Emergentes
     "RKLB":    {"name": "Rocket Lab USA",                      "group": "Emergentes"},
+    "ASTS":    {"name": "AST SpaceMobile",                     "group": "Emergentes"},
+    "ICLN":    {"name": "iShares Global Clean Energy ETF",     "group": "Emergentes"},
+    "CEG":     {"name": "Constellation Energy Corporation",    "group": "Emergentes"},
+    "VST":     {"name": "Vistra Corp.",                        "group": "Emergentes"},
 }
 
 MY_PORTFOLIO = ["SPY", "AAPL", "KO", "XLK", "META", "GOLD", "XLV", "JPM", "BAC", "RKLB"]
