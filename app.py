@@ -55,6 +55,11 @@ TICKERS = {
     "XLV":     {"name": "Health Care Select Sector SPDR",      "group": "Top 20"},
     "XLE":     {"name": "Energy Select Sector SPDR",           "group": "Top 20"},
     "IHI":     {"name": "iShares U.S. Medical Devices ETF",    "group": "Top 20"},
+    # Índices globales
+    "DIA":     {"name": "Dow Jones Industrial Avg. ETF",       "group": "Top 20"},
+    "IWM":     {"name": "Russell 2000 ETF",                    "group": "Top 20"},
+    "EEM":     {"name": "MSCI Emerging Markets ETF",           "group": "Top 20"},
+    "ILF":     {"name": "Latin America 40 ETF",                "group": "Top 20"},
     # Macro
     "UUP":     {"name": "US Dollar Index ETF (≈DXY)",          "group": "Macro"},
     "USO":     {"name": "United States Oil Fund (≈WTI)",       "group": "Macro"},
