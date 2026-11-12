@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from deep_translator import GoogleTranslator
 
 st.set_page_config(
@@ -27,8 +28,8 @@ TICKERS = {
     "JPM":     {"name": "JPMorgan Chase & Co.",                "group": "Mi Cartera"},
     "BAC":     {"name": "Bank of America Corp.",               "group": "Mi Cartera"},
     "RKLB":    {"name": "Rocket Lab USA",                      "group": "Mi Cartera"},
+    "CEG":     {"name": "Constellation Energy",                "group": "Mi Cartera"},
     # Seguimiento (candidatas / en análisis)
-    "CEG":     {"name": "Constellation Energy",                "group": "Seguimiento"},
     "VST":     {"name": "Vistra Corp.",                        "group": "Seguimiento"},
     "VIST":    {"name": "Vista Energy",                        "group": "Seguimiento"},
     "ICLN":    {"name": "iShares Global Clean Energy ETF",     "group": "Seguimiento"},
@@ -65,7 +66,7 @@ TICKERS = {
     "BTC-USD": {"name": "Bitcoin",                             "group": "Macro"},
 }
 
-MY_PORTFOLIO = ["SPY", "XLK", "KO", "META", "XLV", "GOLD", "AAPL", "RKLB", "JPM", "BAC"]
+MY_PORTFOLIO = ["SPY", "XLK", "KO", "META", "XLV", "GOLD", "AAPL", "RKLB", "JPM", "BAC", "CEG"]
 
 GROUP_ORDER = ["Mi Cartera", "Seguimiento", "Tecnología", "Top 20", "Macro"]
 
@@ -217,7 +218,7 @@ def color_pct(val):
 
 with st.sidebar:
     st.title("📈 Market Dashboard")
-    st.caption(f"Actualizado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    st.caption(f"Actualizado: {datetime.now(ZoneInfo('America/Argentina/Buenos_Aires')).strftime('%d/%m/%Y %H:%M')}")
 
     if st.button("🔄 Actualizar datos", use_container_width=True):
         st.cache_data.clear()
