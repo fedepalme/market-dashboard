@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from deep_translator import GoogleTranslator
 
 st.set_page_config(
@@ -23,6 +23,16 @@ TICKERS = {
     "XLK":     {"name": "Technology Select Sector SPDR",       "group": "Mi Cartera"},
     "META":    {"name": "Meta Platforms Inc.",                 "group": "Mi Cartera"},
     "GOLD":    {"name": "Barrick Gold Corporation",            "group": "Mi Cartera"},
+    "XLV":     {"name": "Health Care Select Sector SPDR",      "group": "Mi Cartera"},
+    "JPM":     {"name": "JPMorgan Chase & Co.",                "group": "Mi Cartera"},
+    "BAC":     {"name": "Bank of America Corp.",               "group": "Mi Cartera"},
+    "RKLB":    {"name": "Rocket Lab USA",                      "group": "Mi Cartera"},
+    # Seguimiento (candidatas / en análisis)
+    "CEG":     {"name": "Constellation Energy",                "group": "Seguimiento"},
+    "VST":     {"name": "Vistra Corp.",                        "group": "Seguimiento"},
+    "VIST":    {"name": "Vista Energy",                        "group": "Seguimiento"},
+    "ICLN":    {"name": "iShares Global Clean Energy ETF",     "group": "Seguimiento"},
+    "GLD":     {"name": "SPDR Gold Shares ETF",                "group": "Seguimiento"},
     # Tecnología
     "NVDA":    {"name": "NVIDIA Corporation",                  "group": "Tecnología"},
     "MSFT":    {"name": "Microsoft Corporation",               "group": "Tecnología"},
@@ -35,7 +45,6 @@ TICKERS = {
     "QQQ":     {"name": "Invesco QQQ Trust (Nasdaq-100)",      "group": "Tecnología"},
     # Top 20
     "BRK.B":   {"name": "Berkshire Hathaway Inc.",             "group": "Top 20"},
-    "JPM":     {"name": "JPMorgan Chase & Co.",                "group": "Top 20"},
     "V":       {"name": "Visa Inc.",                           "group": "Top 20"},
     "UNH":     {"name": "UnitedHealth Group Inc.",             "group": "Top 20"},
     "JNJ":     {"name": "Johnson & Johnson",                   "group": "Top 20"},
@@ -44,37 +53,21 @@ TICKERS = {
     "XOM":     {"name": "ExxonMobil Corporation",              "group": "Top 20"},
     "DIS":     {"name": "The Walt Disney Company",             "group": "Top 20"},
     "NFLX":    {"name": "Netflix Inc.",                        "group": "Top 20"},
-    "BAC":     {"name": "Bank of America Corp.",               "group": "Top 20"},
     "MA":      {"name": "Mastercard Inc.",                     "group": "Top 20"},
     "HD":      {"name": "The Home Depot Inc.",                 "group": "Top 20"},
     "LLY":     {"name": "Eli Lilly and Company",               "group": "Top 20"},
     "COST":    {"name": "Costco Wholesale Corp.",              "group": "Top 20"},
     "MCD":     {"name": "McDonald's Corporation",              "group": "Top 20"},
-    "GLD":     {"name": "SPDR Gold Shares ETF",                "group": "Top 20"},
     "TLT":     {"name": "iShares 20+ Year Treasury Bond ETF",  "group": "Top 20"},
-    "XLV":     {"name": "Health Care Select Sector SPDR",      "group": "Top 20"},
-    "XLE":     {"name": "Energy Select Sector SPDR",           "group": "Top 20"},
-    "IHI":     {"name": "iShares U.S. Medical Devices ETF",    "group": "Top 20"},
-    # Índices globales
-    "DIA":     {"name": "Dow Jones Industrial Avg. ETF",       "group": "Top 20"},
-    "IWM":     {"name": "Russell 2000 ETF",                    "group": "Top 20"},
-    "EEM":     {"name": "MSCI Emerging Markets ETF",           "group": "Top 20"},
-    "ILF":     {"name": "Latin America 40 ETF",                "group": "Top 20"},
     # Macro
     "UUP":     {"name": "US Dollar Index ETF (≈DXY)",          "group": "Macro"},
     "USO":     {"name": "United States Oil Fund (≈WTI)",       "group": "Macro"},
     "BTC-USD": {"name": "Bitcoin",                             "group": "Macro"},
-    # Emergentes
-    "RKLB":    {"name": "Rocket Lab USA",                      "group": "Emergentes"},
-    "ASTS":    {"name": "AST SpaceMobile",                     "group": "Emergentes"},
-    "ICLN":    {"name": "iShares Global Clean Energy ETF",     "group": "Emergentes"},
-    "CEG":     {"name": "Constellation Energy Corporation",    "group": "Emergentes"},
-    "VST":     {"name": "Vistra Corp.",                        "group": "Emergentes"},
 }
 
-MY_PORTFOLIO = ["SPY", "AAPL", "KO", "XLK", "META", "GOLD", "XLV", "JPM", "BAC", "RKLB"]
+MY_PORTFOLIO = ["SPY", "XLK", "KO", "META", "XLV", "GOLD", "AAPL", "RKLB", "JPM", "BAC"]
 
-GROUP_ORDER = ["Mi Cartera", "Tecnología", "Top 20", "Macro", "Emergentes"]
+GROUP_ORDER = ["Mi Cartera", "Seguimiento", "Tecnología", "Top 20", "Macro"]
 
 # ── Data fetching ──────────────────────────────────────────────────────────────
 
@@ -220,100 +213,11 @@ def color_pct(val):
     return f"color: {color}; font-weight: 600"
 
 
-_MOVERS_COL_CFG = lambda pct_col: {
-    "Ticker":  st.column_config.TextColumn("Ticker",  width=50),
-    "Empresa": st.column_config.TextColumn("Empresa", width=130),
-    "Precio":  st.column_config.TextColumn("Precio",  width=72),
-    pct_col:   st.column_config.TextColumn(pct_col,   width=78),
-}
-
-def _movers_styled(dataframe: pd.DataFrame, pct_col: str):
-    cols = [c for c in ["Ticker", "Empresa", "Precio", pct_col] if c in dataframe.columns]
-    return (
-        dataframe[cols].style
-        .map(color_pct, subset=[pct_col])
-        .format({"Precio": "${:,.2f}", pct_col: "{:+.2f}%"}, na_rep="—")
-    )
-
-def movers_table(dataframe: pd.DataFrame, pct_col: str):
-    st.dataframe(
-        _movers_styled(dataframe, pct_col),
-        use_container_width=True,
-        hide_index=True,
-        column_config=_MOVERS_COL_CFG(pct_col),
-    )
-
-def movers_table_selectable(dataframe: pd.DataFrame, pct_col: str, key: str) -> str | None:
-    event = st.dataframe(
-        _movers_styled(dataframe, pct_col),
-        use_container_width=True,
-        hide_index=True,
-        column_config=_MOVERS_COL_CFG(pct_col),
-        on_select="rerun",
-        selection_mode="single-row",
-        key=key,
-    )
-    if event.selection.rows:
-        return dataframe.iloc[event.selection.rows[0]]["Ticker"]
-    return None
-
-
-@st.dialog("📈 Performance — 6 meses", width="large")
-def show_performance_chart(ticker: str, company: str):
-    hist = hist_map.get(ticker)
-    if hist is None:
-        st.warning("Sin datos históricos para este ticker.")
-        return
-
-    cutoff = pd.Timestamp(datetime.now() - timedelta(days=182))
-    if hist.index.tz is not None:
-        cutoff = cutoff.tz_localize("UTC")
-    hist_6m = hist[hist.index >= cutoff]
-
-    if hist_6m.empty:
-        st.warning("Sin datos en los últimos 6 meses.")
-        return
-
-    st.markdown(f"### {ticker} — {company}")
-
-    price_now   = hist_6m["Close"].iloc[-1]
-    price_start = hist_6m["Close"].iloc[0]
-    pct_6m      = (price_now / price_start - 1) * 100
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Precio actual",    f"${price_now:,.2f}")
-    col2.metric("Hace 6 meses",     f"${price_start:,.2f}")
-    col3.metric("Variación 6M",     f"{pct_6m:+.2f}%", delta=f"{pct_6m:+.2f}%")
-
-    fig = go.Figure(go.Candlestick(
-        x=hist_6m.index,
-        open=hist_6m["Open"],
-        high=hist_6m["High"],
-        low=hist_6m["Low"],
-        close=hist_6m["Close"],
-        name=ticker,
-        increasing_line_color="#16a34a",
-        decreasing_line_color="#dc2626",
-    ))
-    fig.update_layout(
-        xaxis_rangeslider_visible=False,
-        height=380,
-        margin=dict(t=20, b=20, l=10, r=10),
-        plot_bgcolor="#1e293b",
-        paper_bgcolor="#1e293b",
-        font_color="#f1f5f9",
-        xaxis=dict(gridcolor="#334155"),
-        yaxis=dict(gridcolor="#334155", tickprefix="$"),
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 
 with st.sidebar:
     st.title("📈 Market Dashboard")
-    ARG = timezone(timedelta(hours=-3))
-    now_arg = datetime.now(ARG)
-    st.caption(f"Actualizado: {now_arg.strftime('%d/%m/%Y %H:%M')} (ARG)")
+    st.caption(f"Actualizado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 
     if st.button("🔄 Actualizar datos", use_container_width=True):
         st.cache_data.clear()
@@ -370,14 +274,16 @@ if page == "Mi Cartera":
         st.warning("No se pudieron cargar los datos de tu cartera.")
     else:
         # KPI cards
-        cols = st.columns(len(df_port))
-        for col, (_, row) in zip(cols, df_port.iterrows()):
-            delta = row["1S %"]
-            col.metric(
-                label=f"{row['Ticker']}",
-                value=f"${row['Precio']:,.2f}",
-                delta=f"{delta:+.2f}% (1S)" if delta is not None else "—",
-            )
+        port_rows = list(df_port.iterrows())
+        for start in range(0, len(port_rows), 5):
+            cols = st.columns(5)
+            for col, (_, row) in zip(cols, port_rows[start:start + 5]):
+                delta = row["1S %"]
+                col.metric(
+                    label=f"{row['Ticker']}",
+                    value=f"${row['Precio']:,.2f}",
+                    delta=f"{delta:+.2f}% (1S)" if pd.notna(delta) else "—",
+                )
 
         st.divider()
 
@@ -426,255 +332,75 @@ if page == "Mi Cartera":
 # ══════════════════════════════════════════════════════════════════════════════
 
 elif page == "Movers":
-    st.markdown("""
-    <style>
-    div[data-testid="stDataFrame"] div[class*="dvn-scroller"] * { font-size: 0.75rem !important; }
-    div[data-testid="stDataFrame"] .ag-cell { font-size: 0.75rem !important; padding: 2px 6px !important; }
-    div[data-testid="stDataFrame"] .ag-header-cell-label { font-size: 0.73rem !important; }
-    div[data-testid="stDataFrame"] .ag-row { min-height: 28px !important; height: 28px !important; }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.header("🚀 Movers")
-    st.caption("Ranking de movimientos por período. No es recomendación de compra/venta.")
+    st.header("🚀 Movers de la Semana")
+    st.caption("Ranking de movimientos semanales. No es recomendación de compra/venta.")
 
     if df.empty:
         st.warning("Sin datos disponibles.")
     else:
-        MONTH_NAMES = {
-            1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
-            5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
-            9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre",
-        }
+        df_movers = df.dropna(subset=["1S %"]).copy()
+        mover_cols = ["Ticker", "Empresa", "Grupo", "Precio", "1S %", "YTD %"]
 
-        def period_return(ticker: str, start, end) -> float | None:
-            hist = hist_map.get(ticker)
-            if hist is None or hist.empty:
-                return None
-            # Normalize index to date-only, stripping timezone
-            idx_dates = hist.index.tz_localize(None) if hist.index.tz is not None else hist.index
-            idx_dates = idx_dates.normalize()
-            start_ts  = pd.Timestamp(start)
-            end_ts    = pd.Timestamp(end)
-            segment   = hist[(idx_dates >= start_ts) & (idx_dates <= end_ts)]
-            if len(segment) < 2:
-                return None
-            return round((segment["Close"].iloc[-1] / segment["Close"].iloc[0] - 1) * 100, 2)
+        col_top, col_bot = st.columns(2, gap="large")
 
-        def build_movers_df(start, end, pct_col: str) -> pd.DataFrame:
-            rows = []
-            for ticker, meta in TICKERS.items():
-                if selected_groups and meta["group"] not in selected_groups:
-                    continue
-                pct = period_return(ticker, start, end)
-                if pct is None:
-                    continue
-                price = hist_map[ticker]["Close"].iloc[-1] if ticker in hist_map else None
-                rows.append({
-                    "Ticker":  ticker,
-                    "Empresa": meta["name"],
-                    "Precio":  round(price, 2) if price else None,
-                    pct_col:   pct,
-                })
-            return pd.DataFrame(rows)
+        with col_top:
+            st.subheader("🟢 Top 5 Ganadoras — 1S%")
+            top5 = df_movers.nlargest(5, "1S %")[mover_cols]
+            st.dataframe(
+                styled_table(top5.reset_index(drop=True)),
+                use_container_width=True,
+                hide_index=True,
+            )
 
-        # ── Semanal ───────────────────────────────────────────────────────────
-        st.subheader("📅 Semana")
-        end_week = st.date_input(
-            "Ver semana hasta:",
-            value=datetime.now().date(),
-            max_value=datetime.now().date(),
-            key="week_end",
+        with col_bot:
+            st.subheader("🔴 Top 5 Perdedoras — 1S%")
+            bot5 = df_movers.nsmallest(5, "1S %")[mover_cols]
+            st.dataframe(
+                styled_table(bot5.reset_index(drop=True)),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        st.divider()
+
+        st.subheader("📊 Ranking YTD — todos los instrumentos")
+        st.caption("Ordenado por rendimiento desde el 1 de enero.")
+        df_ytd = df.dropna(subset=["YTD %"]).sort_values("YTD %", ascending=False)
+        display_cols = ["Ticker", "Empresa", "Grupo", "Precio", "1S %", "1M %", "YTD %", "1A %"]
+        st.dataframe(
+            styled_table(df_ytd[display_cols].reset_index(drop=True)),
+            use_container_width=True,
+            hide_index=True,
         )
-        start_week = end_week - timedelta(days=7)
-        st.caption(f"Período: {start_week.strftime('%d/%m/%Y')} → {end_week.strftime('%d/%m/%Y')}")
-
-        df_sem = build_movers_df(start_week, end_week, "1S %")
-
-        if df_sem.empty:
-            st.info("Sin datos para el período seleccionado.")
-        else:
-            col_g, col_p = st.columns(2, gap="small")
-            with col_g:
-                ganadores = df_sem[df_sem["1S %"] > 0].nlargest(5, "1S %").reset_index(drop=True)
-                st.markdown(f"##### 🟢 Top 5 Ganadoras ({len(ganadores)} con subida)")
-                st.caption("Click en una fila para ver el gráfico")
-                if not ganadores.empty:
-                    sel = movers_table_selectable(ganadores, "1S %", key="sem_gan")
-                    if sel:
-                        show_performance_chart(sel, TICKERS.get(sel, {}).get("name", sel))
-                else:
-                    st.info("Sin ganadoras esta semana.")
-            with col_p:
-                perdedores = df_sem[df_sem["1S %"] < 0].nsmallest(5, "1S %").reset_index(drop=True)
-                st.markdown(f"##### 🔴 Top 5 Perdedoras ({len(perdedores)} con baja)")
-                st.caption("Click en una fila para ver el gráfico")
-                if not perdedores.empty:
-                    sel = movers_table_selectable(perdedores, "1S %", key="sem_per")
-                    if sel:
-                        show_performance_chart(sel, TICKERS.get(sel, {}).get("name", sel))
-                else:
-                    st.info("Sin perdedoras esta semana.")
 
         st.divider()
 
-        # ── Mensual (mes cerrado) ─────────────────────────────────────────────
-        st.subheader("📅 Mes cerrado")
-
-        # Build list of closed months (up to 13 months back, excluding current month)
-        today = datetime.now()
-        closed_months = []
-        for i in range(1, 14):
-            d = (today.replace(day=1) - timedelta(days=i * 28)).replace(day=1)
-            closed_months.append(d)
-        closed_months = sorted(set(
-            m.replace(day=1) for m in closed_months if m < today.replace(day=1)
-        ), reverse=True)
-        month_labels = [f"{MONTH_NAMES[m.month]} {m.year}" for m in closed_months]
-
-        selected_month_label = st.selectbox("Seleccioná el mes:", month_labels, key="month_sel")
-        selected_month = closed_months[month_labels.index(selected_month_label)]
-
-        import calendar
-        last_day = calendar.monthrange(selected_month.year, selected_month.month)[1]
-        start_month = selected_month.date()
-        end_month   = selected_month.replace(day=last_day).date()
-        st.caption(f"Período: {start_month.strftime('%d/%m/%Y')} → {end_month.strftime('%d/%m/%Y')}")
-
-        df_mes = build_movers_df(start_month, end_month, "1M %")
-
-        if df_mes.empty:
-            st.info("Sin datos para el mes seleccionado.")
-        else:
-            col_gm, col_pm = st.columns(2, gap="small")
-            with col_gm:
-                gan_mes = df_mes[df_mes["1M %"] > 0].nlargest(20, "1M %").reset_index(drop=True)
-                st.markdown(f"##### 🟢 Top 20 Ganadoras ({len(gan_mes)} con subida)")
-                st.caption("Click en una fila para ver el gráfico")
-                if not gan_mes.empty:
-                    sel = movers_table_selectable(gan_mes, "1M %", key="mes_gan")
-                    if sel:
-                        show_performance_chart(sel, TICKERS.get(sel, {}).get("name", sel))
-                else:
-                    st.info("Sin ganadoras este mes.")
-            with col_pm:
-                per_mes = df_mes[df_mes["1M %"] < 0].nsmallest(20, "1M %").reset_index(drop=True)
-                st.markdown(f"##### 🔴 Top 20 Perdedoras ({len(per_mes)} con baja)")
-                st.caption("Click en una fila para ver el gráfico")
-                if not per_mes.empty:
-                    sel = movers_table_selectable(per_mes, "1M %", key="mes_per")
-                    if sel:
-                        show_performance_chart(sel, TICKERS.get(sel, {}).get("name", sel))
-                else:
-                    st.info("Sin perdedoras este mes.")
-
-        st.divider()
-
-        # ── Emergentes ────────────────────────────────────────────────────────
-        st.subheader("🌱 Emergentes — Under the radar")
-        st.caption("Compañías de menor perfil con movimientos destacados esta semana y este mes.")
-
-        EMERGENTES = {
-            "PLTR":  "Palantir Technologies",
-            "SNOW":  "Snowflake Inc.",
-            "NET":   "Cloudflare Inc.",
-            "DDOG":  "Datadog Inc.",
-            "CRWD":  "CrowdStrike Holdings",
-            "COIN":  "Coinbase Global Inc.",
-            "APP":   "AppLovin Corporation",
-            "HIMS":  "Hims & Hers Health",
-            "RDDT":  "Reddit Inc.",
-            "RKLB":  "Rocket Lab USA",
-            "ASTS":  "AST SpaceMobile",
-            "ACHR":  "Archer Aviation",
-            "IONQ":  "IonQ Inc. (Quantum Computing)",
-            "OKLO":  "Oklo Inc. (Nuclear Energy)",
-            "SOUN":  "SoundHound AI Inc.",
-            "RXRX":  "Recursion Pharmaceuticals",
-            "CELH":  "Celsius Holdings",
-            "BROS":  "Dutch Bros Inc.",
-            "CAVA":  "CAVA Group Inc.",
-            "AFRM":  "Affirm Holdings",
-            "HOOD":  "Robinhood Markets",
-            "RIVN":  "Rivian Automotive",
-            "JOBY":  "Joby Aviation",
-            "SMCI":  "Super Micro Computer",
-            "MSTR":  "MicroStrategy Inc.",
-            "ARKK":  "ARK Innovation ETF",
-            "ARKG":  "ARK Genomic Revolution ETF",
-        }
-
-        @st.cache_data(ttl=3600, show_spinner=False)
-        def fetch_emergentes_data():
-            end = datetime.now()
-            start = end - timedelta(days=400)
-            result = {}
-            for ticker in EMERGENTES:
-                try:
-                    hist = yf.Ticker(ticker).history(start=start, end=end, auto_adjust=True)
-                    if not hist.empty:
-                        result[ticker] = hist
-                except Exception:
-                    continue
-            return result
-
-        def build_emergentes_df(hist_data: dict, start, end, pct_col: str) -> pd.DataFrame:
-            rows = []
-            for ticker, name in EMERGENTES.items():
-                hist = hist_data.get(ticker)
-                if hist is None or hist.empty:
-                    continue
-                idx = hist.index.tz_localize(None) if hist.index.tz else hist.index
-                idx = idx.normalize()
-                seg = hist[(idx >= pd.Timestamp(start)) & (idx <= pd.Timestamp(end))]
-                if len(seg) < 2:
-                    continue
-                pct = round((seg["Close"].iloc[-1] / seg["Close"].iloc[0] - 1) * 100, 2)
-                price = round(hist["Close"].iloc[-1], 2)
-                rows.append({"Ticker": ticker, "Empresa": name, "Precio": price, pct_col: pct})
-            return pd.DataFrame(rows)
-
-        with st.spinner("Cargando emergentes..."):
-            em_hist = fetch_emergentes_data()
-
-        # Emergentes semanal
-        st.markdown("**📅 Esta semana**")
-        df_em_sem = build_emergentes_df(em_hist, start_week, end_week, "1S %")
-        if not df_em_sem.empty:
-            col_es, col_ep = st.columns(2, gap="small")
-            with col_es:
-                em_gan_sem = df_em_sem[df_em_sem["1S %"] > 0].nlargest(5, "1S %").reset_index(drop=True)
-                st.markdown(f"##### 🟢 Top 5 Ganadoras ({len(em_gan_sem)} con subida)")
-                if not em_gan_sem.empty:
-                    movers_table(em_gan_sem, "1S %")
-                else:
-                    st.info("Sin ganadoras.")
-            with col_ep:
-                em_per_sem = df_em_sem[df_em_sem["1S %"] < 0].nsmallest(5, "1S %").reset_index(drop=True)
-                st.markdown(f"##### 🔴 Top 5 Perdedoras ({len(em_per_sem)} con baja)")
-                if not em_per_sem.empty:
-                    movers_table(em_per_sem, "1S %")
-                else:
-                    st.info("Sin perdedoras.")
-
-        st.markdown("**📅 Este mes**")
-        df_em_mes = build_emergentes_df(em_hist, start_month, end_month, "1M %")
-        if not df_em_mes.empty:
-            col_ems, col_emp = st.columns(2, gap="small")
-            with col_ems:
-                em_gan_mes = df_em_mes[df_em_mes["1M %"] > 0].nlargest(10, "1M %").reset_index(drop=True)
-                st.markdown(f"##### 🟢 Top 10 Ganadoras ({len(em_gan_mes)} con subida)")
-                if not em_gan_mes.empty:
-                    movers_table(em_gan_mes, "1M %")
-                else:
-                    st.info("Sin ganadoras.")
-            with col_emp:
-                em_per_mes = df_em_mes[df_em_mes["1M %"] < 0].nsmallest(10, "1M %").reset_index(drop=True)
-                st.markdown(f"##### 🔴 Top 10 Perdedoras ({len(em_per_mes)} con baja)")
-                if not em_per_mes.empty:
-                    movers_table(em_per_mes, "1M %")
-                else:
-                    st.info("Sin perdedoras.")
+        st.subheader("📈 Evolución YTD — Top 5 ganadoras")
+        year_start = f"{datetime.now().year}-01-01"
+        fig2 = go.Figure()
+        for ticker in top5["Ticker"].tolist():
+            hist = hist_map.get(ticker)
+            if hist is None:
+                continue
+            ytd_hist = hist[hist.index >= year_start]["Close"]
+            if ytd_hist.empty:
+                continue
+            normalized = (ytd_hist / ytd_hist.iloc[0]) * 100
+            fig2.add_trace(go.Scatter(
+                x=normalized.index,
+                y=normalized.values,
+                name=f"{ticker}",
+                mode="lines",
+            ))
+        fig2.add_hline(y=100, line_dash="dash", line_color="gray", opacity=0.5)
+        fig2.update_layout(
+            xaxis_title="Fecha",
+            yaxis_title="Rendimiento (base 100)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+            height=380,
+            margin=dict(t=40, b=20),
+        )
+        st.plotly_chart(fig2, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
